@@ -44,7 +44,7 @@ object ExampleSQL extends App {
   ).show
 
   val homeDir = System.getProperty("user.home");
-  var path = homeDir + File.separator + "neverpayer" + File.separator
+  var path = homeDir + File.separator + "directory" + File.separator
   path = path.replaceFirst("^~", System.getProperty("user.home"))
 
   //  val rawDf = readCsv(spark, path + "pathToFile")
