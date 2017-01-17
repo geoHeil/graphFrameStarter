@@ -43,6 +43,9 @@ and edges
 +---+---+------------+
 ```
 
+## ongoing discussions
+  - https://forums.manning.com/posts/list/39971.page
+
 ## some graph-frames tutorials
 
   - https://www.mapr.com/blog/using-spark-graphframes-analyze-facebook-connections

@@ -23,9 +23,6 @@ object ExampleSQL extends App {
 
   import spark.implicits._
 
-  //  case class Vertices(id:String, name:String, fraud:Int)
-  //  case class Edges(src:String, dst:String, relationship:String)
-
   val v = spark.createDataFrame(List(
     ("a", "Alice", 1),
     ("b", "Bob", 0),
@@ -35,8 +32,6 @@ object ExampleSQL extends App {
     ("f", "Fanny", 0),
     ("g", "Gabby", 0)
   )).toDF("id", "name", "fraud")
-  //.as[Vertices]
-  // Edge DataFrame
   val e = spark.createDataFrame(List(
     ("a", "b", "A"),
     ("b", "c", "B"),
@@ -47,14 +42,9 @@ object ExampleSQL extends App {
     ("d", "a", "A"),
     ("a", "e", "A")
   )).toDF("src", "dst", "relationship")
-  //.as[Edges]
-  // Create a GraphFrame
   val g = GraphFrame(v, e)
 
-  g.edges.repartition(1).write.csv("edges")
-  g.vertices.repartition(1).write.csv("vertices")
-
-  println(toGexf(g.toGraphX))
+  println(toGraphML(g))
   val pw = new java.io.PrintWriter("myGraph.graphml")
   pw.write(toGraphML(g))
   pw.close
@@ -94,27 +84,6 @@ object ExampleSQL extends App {
   // percentage of in and out degree for fraud for direct node and friends of friends
 
   // compute shortest pats to fraud
-
-  //  val pw = new java.io.PrintWriter("myGraph.gexf")
-  //  pw.write(toGexf(g.toGraphX))
-  //  pw.close
-
-  // TODO this does not keep the required edge information e.g. type of edge
-  def toGexf[VD, ED](g: Graph[VD, ED]): String =
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-      "<gexf xmlns=\"http://www.gexf.net/1.2draft\" version=\"1.2\">\n" +
-      "  <graph mode=\"static\" defaultedgetype=\"directed\">\n" +
-      "    <nodes>\n" +
-      g.vertices.map(v => "      <node id=\"" + v._1 + "\" label=\"" +
-        v._2 + "\" />\n").collect.mkString +
-      "    </nodes>\n" +
-      "    <edges>\n" +
-      g.edges.map(e => "      <edge source=\"" + e.srcId +
-        "\" target=\"" + e.dstId + "\" label=\"" + e.attr +
-        "\" />\n").collect.mkString +
-      "    </edges>\n" +
-      "  </graph>\n" +
-      "</gexf>"
 
   // TODO access node
   // maybe https://github.com/apache/tinkerpop/blob/4293eb333dfbf3aea19cd326f9f3d13619ac0b54/gremlin-core/src/main/java/org/apache/tinkerpop/gremlin/structure/io/graphml/GraphMLWriter.java is helpful
