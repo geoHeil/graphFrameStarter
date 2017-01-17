@@ -122,7 +122,7 @@ object ExampleSQL extends App {
 
   toGraphML(g)
   println(toGraphML(g))
-
+/// TODO improve writer as outlined by https://github.com/sparkling-graph/sparkling-graph/issues/8 and integrate there
   def toGraphML(g: GraphFrame): String =
     s"""
        |<?xml version="1.0" encoding="UTF-8"?>
