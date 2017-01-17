@@ -1,66 +1,108 @@
 package myOrg
 
-import java.io.File
-
+import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.graphx.Graph
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.graphframes.GraphFrame
 
 object ExampleSQL extends App {
 
+  val logger: Logger = Logger.getLogger(this.getClass)
+
   val conf: SparkConf = new SparkConf()
-    .setAppName("exampleSQL")
+    .setAppName("graphExample")
     .setMaster("local[*]")
-    .set("spark.executor.extraJavaOptions", "-XX:+UseG1GC")
     .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    .set("spark.kryoserializer.buffer.max", "1G")
-    .set("spark.kryoserializer.buffer", "100m")
 
   val spark: SparkSession = SparkSession
     .builder()
     .config(conf)
-    .enableHiveSupport()
     .getOrCreate()
 
-  import spark.implicits._
+  val v = spark.createDataFrame(List(
+    ("a", "Alice", 1),
+    ("b", "Bob", 0),
+    ("c", "Charlie", 0),
+    ("d", "David", 0),
+    ("e", "Esther", 0),
+    ("f", "Fanny", 0),
+    ("g", "Gabby", 0)
+  )).toDF("id", "name", "fraud")
+  // Edge DataFrame
+  val e = spark.createDataFrame(List(
+    ("a", "b", "A"),
+    ("b", "c", "B"),
+    ("c", "b", "B"),
+    ("f", "c", "B"),
+    ("e", "f", "B"),
+    ("e", "d", "A"),
+    ("d", "a", "A"),
+    ("a", "e", "A")
+  )).toDF("src", "dst", "relationship")
+  // Create a GraphFrame
+  val g = GraphFrame(v, e)
 
-  val df = Seq(
-    (0, "A", "B", "C", "D"),
-    (1, "A", "B", "C", "D"),
-    (0, "d", "a", "jkl", "d"),
-    (0, "d", "g", "C", "D"),
-    (1, "A", "d", "t", "k"),
-    (1, "d", "c", "C", "D"),
-    (1, "c", "B", "C", "D")
-  ).toDF("TARGET", "col1", "col2", "col3TooMany", "col4")
+  g.vertices.show
+  g.edges.show
 
-  df.show
+  g.inDegrees.show
+  g.outDegrees.show
+  g.degrees.show
+  //  g.vertices.groupBy().max("fraud").show
 
-  // now using sql
-  df.createOrReplaceTempView("mydf")
-  spark.sql(
-    """
-      |SELECT * FROM mydf
-    """.stripMargin
-  ).show
+  g.edges.filter("relationship = 'B'").count
 
-  val homeDir = System.getProperty("user.home");
-  var path = homeDir + File.separator + "directory" + File.separator
-  path = path.replaceFirst("^~", System.getProperty("user.home"))
+  //  val g = examples.Graphs.friends
+  val motifs: DataFrame = g.find("(a)-[e]->(b); (b)-[e2]->(a)")
+  motifs.show
+  motifs.filter("b.fraud > 0").show
 
-  //  val rawDf = readCsv(spark, path + "pathToFile")
+  val chain4 = g.find("(a)-[ab]->(b); (b)-[bc]->(c); (c)-[cd]->(d)")
+
+  // Query on sequence, with state (cnt)
+  //  (a) Define method for updating state given the next element of the motif.
+  def sumCall(cnt: Column, relationship: Column): Column = {
+    when(relationship === "A", cnt + 1).otherwise(cnt)
+  }
+
+  //  (b) Use sequence operation to apply method to sequence of elements in motif.
+  //      In this case, the elements are the 3 edges.
+  val condition = Seq("ab", "bc", "cd").
+    foldLeft(lit(0))((cnt, e) => sumCall(cnt, col(e)("relationship")))
+  //  (c) Apply filter to DataFrame.
+  val chainWith2Friends2 = chain4.where(condition >= 2)
+  chainWith2Friends2.show
+
+  // TODO compute mentioned fraud values values
+  // percentage of in and out degree for fraud for direct node and friends of friends
+
+  // compute shortest pats to fraud
+
+
+//  val pw = new java.io.PrintWriter("myGraph.gexf")
+//  pw.write(toGexf(g.toGraphX))
+//  pw.close
 
   spark.stop
 
-  def readCsv(spark: SparkSession, inputPath: String): DataFrame = {
-    //    import spark.implicits._
-    spark.read.
-      option("header", "true")
-      .option("inferSchema", true)
-      .option("charset", "UTF-8")
-      .option("delimiter", ";")
-      .csv(inputPath)
-      .withColumn("col1", $"col1".cast("Date"))
-      .withColumnRenamed("col2", "colAAA")
-  }
-
+  // TODO this does not keep the required edge information e.g. type of edge
+  // maybe look at R socialMediaLab package for help
+  def toGexf[VD, ED](g: Graph[VD, ED]): String =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+      "<gexf xmlns=\"http://www.gexf.net/1.2draft\" version=\"1.2\">\n" +
+      "  <graph mode=\"static\" defaultedgetype=\"directed\">\n" +
+      "    <nodes>\n" +
+      g.vertices.map(v => "      <node id=\"" + v._1 + "\" label=\"" +
+        v._2 + "\" />\n").collect.mkString +
+      "    </nodes>\n" +
+      "    <edges>\n" +
+      g.edges.map(e => "      <edge source=\"" + e.srcId +
+        "\" target=\"" + e.dstId + "\" label=\"" + e.attr +
+        "\" />\n").collect.mkString +
+      "    </edges>\n" +
+      "  </graph>\n" +
+      "</gexf>"
 }
+

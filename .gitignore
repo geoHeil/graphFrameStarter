@@ -3,3 +3,4 @@ project/target/config-classes
 project/target
 target
 metastore_db
+myGraph.gexf

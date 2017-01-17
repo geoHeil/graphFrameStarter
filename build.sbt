@@ -25,10 +25,13 @@ parallelExecution in Test := false
 
 lazy val spark = "2.1.0"
 
+resolvers += "Spark Packages Repo" at "http://dl.bintray.com/spark-packages/maven"
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % spark % "provided",
   "org.apache.spark" %% "spark-sql" % spark % "provided",
-  "org.apache.spark" %% "spark-hive" % spark % "provided"
+  "org.apache.spark" %% "spark-hive" % spark % "provided",
+  "graphframes" % "graphframes" % "0.3.0-spark2.0-s_2.11",
+  "org.apache.spark" %% "spark-graphx" % spark % "provided"
 )
 
 run in Compile <<= Defaults.runTask(fullClasspath in Compile, mainClass in(Compile, run), runner in(Compile, run))
