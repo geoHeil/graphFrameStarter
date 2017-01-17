@@ -5,8 +5,8 @@ I want to compute several metrics for each node.
 For each node compute percentage of fraudulent connections for 
   - direct node (directed)
   - direct node (undirected)
-  - the friendship network form the node (directed)
-  - the friendship network form the node (undirected)
+  - the friendship network from the node (directed)
+  - the friendship network from the node (undirected)
 in total and per connection type.
 
 Getting started with graph-frames I am not sure how to move forward. Looking forward to some suggestions.
