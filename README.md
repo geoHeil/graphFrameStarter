@@ -42,3 +42,16 @@ and edges
 |  a|  e|           A|
 +---+---+------------+
 ```
+
+## some graph-frames tutorials
+
+  - https://www.mapr.com/blog/using-spark-graphframes-analyze-facebook-connections
+  - https://www.youtube.com/watch?v=zx9KI3DsZss
+  
+## coll libraries
+  - https://github.com/sparkling-graph/sparkling-graph
+  
+## visualization
+from generated graphml gephi visualization looks like
+![graph](graph.png "gephi visualization")
+

@@ -4,7 +4,7 @@ import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
 import org.apache.spark.graphx.Graph
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.graphframes.GraphFrame
 
 object ExampleSQL extends App {
@@ -21,6 +21,11 @@ object ExampleSQL extends App {
     .config(conf)
     .getOrCreate()
 
+  import spark.implicits._
+
+  //  case class Vertices(id:String, name:String, fraud:Int)
+  //  case class Edges(src:String, dst:String, relationship:String)
+
   val v = spark.createDataFrame(List(
     ("a", "Alice", 1),
     ("b", "Bob", 0),
@@ -30,6 +35,7 @@ object ExampleSQL extends App {
     ("f", "Fanny", 0),
     ("g", "Gabby", 0)
   )).toDF("id", "name", "fraud")
+  //.as[Vertices]
   // Edge DataFrame
   val e = spark.createDataFrame(List(
     ("a", "b", "A"),
@@ -41,8 +47,17 @@ object ExampleSQL extends App {
     ("d", "a", "A"),
     ("a", "e", "A")
   )).toDF("src", "dst", "relationship")
+  //.as[Edges]
   // Create a GraphFrame
   val g = GraphFrame(v, e)
+
+  g.edges.repartition(1).write.csv("edges")
+  g.vertices.repartition(1).write.csv("vertices")
+
+  println(toGexf(g.toGraphX))
+  val pw = new java.io.PrintWriter("myGraph.graphml")
+  pw.write(toGraphML(g))
+  pw.close
 
   g.vertices.show
   g.edges.show
@@ -80,15 +95,11 @@ object ExampleSQL extends App {
 
   // compute shortest pats to fraud
 
-
-//  val pw = new java.io.PrintWriter("myGraph.gexf")
-//  pw.write(toGexf(g.toGraphX))
-//  pw.close
-
-  spark.stop
+  //  val pw = new java.io.PrintWriter("myGraph.gexf")
+  //  pw.write(toGexf(g.toGraphX))
+  //  pw.close
 
   // TODO this does not keep the required edge information e.g. type of edge
-  // maybe look at R socialMediaLab package for help
   def toGexf[VD, ED](g: Graph[VD, ED]): String =
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
       "<gexf xmlns=\"http://www.gexf.net/1.2draft\" version=\"1.2\">\n" +
@@ -104,5 +115,52 @@ object ExampleSQL extends App {
       "    </edges>\n" +
       "  </graph>\n" +
       "</gexf>"
+
+  // TODO access node
+  // maybe https://github.com/apache/tinkerpop/blob/4293eb333dfbf3aea19cd326f9f3d13619ac0b54/gremlin-core/src/main/java/org/apache/tinkerpop/gremlin/structure/io/graphml/GraphMLWriter.java is helpful
+  // https://github.com/apache/tinkerpop/blob/4293eb333dfbf3aea19cd326f9f3d13619ac0b54/gremlin-core/src/main/java/org/apache/tinkerpop/gremlin/structure/io/graphml/GraphMLTokens.java
+
+  toGraphML(g)
+  println(toGraphML(g))
+
+  def toGraphML(g: GraphFrame): String =
+    s"""
+       |<?xml version="1.0" encoding="UTF-8"?>
+       |<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+       |         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       |         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+       |         http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+       |
+       |  <key id="v_name" for="node" attr.name="name" attr.type="string"/>
+       |  <key id="v_fraud" for="node" attr.name="fraud" attr.type="int"/>
+       |  <key id="e_edgeType" for="edge" attr.name="edgeType" attr.type="string"/>
+       |  <graph id="G" edgedefault="directed">
+       |${
+      g.vertices.map {
+        case Row(id, name, fraud) =>
+          s"""
+             |      <node id="${id}">
+             |         <data key = "v_name">${name}</data>
+             |         <data key = "v_fraud">${fraud}</data>
+             |      </node>
+           """.stripMargin
+      }.collect.mkString.stripLineEnd
+    }
+       |${
+      g.edges.map {
+        case Row(src, dst, relationship) =>
+          s"""
+             |      <edge source="${src}" target="${dst}">
+             |      <data key="e_edgeType">${relationship}</data>
+             |      </edge>
+           """.stripMargin
+      }.collect.mkString.stripLineEnd
+    }
+       |  </graph>
+       |</graphml>
+  """.stripMargin
+
+  spark.stop
+
 }
 
