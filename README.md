@@ -61,13 +61,17 @@ For such a small graph the DAG does not really look simpler. But the timing show
  
 
 **naive method with different types of edges**
-
 ![DAG of naive join variant](graphPercentageWithJoins.jpg "naive and slow joins DAG")
 
 **improved method with different types of edges**
+This does not work really well taking `Array(String, String)` as the key -> otherwise non unique values would handled
+  wrong, i.e. the key is id of vertex and type of connection, if only id is considered we are back to the first example.
 
 
 **pregel API: Message passing via AggregateMessages**
+graph frames and graphX both do support this type of API.
+
+> TODO figure out how to use these to implement the same thing.
 
 ### ongoing discussions
 

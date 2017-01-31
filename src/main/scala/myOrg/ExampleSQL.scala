@@ -179,6 +179,7 @@ object ExampleSQL extends App {
     .withColumnRenamed("count", "fraudCount")
   // lets try it with join first, but already for this minimal dataset it is quite slow
   // this does not weigh follower further away with a smaller fraud score TODO create a weith here (or at least in pregel api)
+  println("friends of friends")
   time(totalF2
     .join(fraudDirectF2, Seq("id"), "left")
     .na.fill(0)
