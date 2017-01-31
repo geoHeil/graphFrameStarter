@@ -200,8 +200,9 @@ object ExampleSQL extends App {
   val fraudNeighbourWeight = 1.0
   // TODO how to add in conditions / total and percentage / weights / type of connection
   val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * (lit(1) + AM.dst("fraud")))
-  //.otherwise(AM.dst("fraud")))
+    .otherwise(lit(0)) //todo make sure this is not resetting everything
   val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * (lit(2) + AM.src("fraud")))
+    .otherwise(lit(0))
   // I am confused about the messages! why do I need to swap them?
   // how to prevent messages circulating forever?
   val agg = g.aggregateMessages
