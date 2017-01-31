@@ -195,16 +195,19 @@ object ExampleSQL extends App {
 
   //  val msgToSrc = AM.dst("fraud")
   //  val msgToDst = AM.src("fraud")
-  // multiply with weith (fraud far away is less important as fraud near the node)
+  // multiply with weight (fraud far away is less important as fraud near the node)
   // to test use score of 1
   val fraudNeighbourWeight = 1.0
-  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * AM.dst("fraud"))
-  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * AM.src("fraud"))
-  val agg = g.aggregateMessages
-    .sendToSrc(msgToSrc) // send destination user's fraud to source
-    .sendToDst(msgToDst) // send source user's fraud to destination
-    .agg(sum(AM.msg).as("summedFraud")) // sum up fraud, stored in AM.msg column
   // TODO how to add in conditions / total and percentage / weights / type of connection
+  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * (lit(1) + AM.dst("fraud")))
+  //.otherwise(AM.dst("fraud")))
+  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * (lit(2) + AM.src("fraud")))
+  // I am confused about the messages! why do I need to swap them?
+  // how to prevent messages circulating forever?
+  val agg = g.aggregateMessages
+    .sendToSrc(msgToDst) // send destination user's fraud to source
+    .sendToDst(msgToSrc) // send source user's fraud to destination
+    .agg(sum(AM.msg).as("summedFraud")) // sum up fraud, stored in AM.msg column
   agg.show()
 
   // ########################################################################################################
