@@ -6,7 +6,7 @@ import org.apache.spark.graphx.util.GraphGenerators
 import org.apache.spark.graphx.{Edge, Graph, VertexId, VertexRDD}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.apache.spark.util.StatCounter
 import org.graphframes.GraphFrame
 import org.graphframes.lib.AggregateMessages
@@ -193,14 +193,19 @@ object ExampleSQL extends App {
   // now pregl message passing API: Message passing via AggregateMessages for graphFrames ##########################################
   val AM = AggregateMessages
 
-  val msgToSrc = AM.dst("fraud")
-  val msgToDst = AM.src("fraud")
+  //  val msgToSrc = AM.dst("fraud")
+  //  val msgToDst = AM.src("fraud")
+  // multiply with weith (fraud far away is less important as fraud near the node)
+  // to test use score of 1
+  val fraudNeighbourWeight = 1.0
+  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * AM.dst("fraud"))
+  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * AM.src("fraud"))
   val agg = g.aggregateMessages
     .sendToSrc(msgToSrc) // send destination user's fraud to source
     .sendToDst(msgToDst) // send source user's fraud to destination
-    .agg(sum(AM.msg).as("summedFraud")) // sum up ages, stored in AM.msg column
-  // TODO how to add in conditions / total and percentage / weights / type of connection similar to GraphX example below?
-  time(agg.show)
+    .agg(sum(AM.msg).as("summedFraud")) // sum up fraud, stored in AM.msg column
+  // TODO how to add in conditions / total and percentage / weights / type of connection
+  agg.show()
 
   // ########################################################################################################
   val graph: Graph[Double, Int] =
