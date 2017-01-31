@@ -83,6 +83,10 @@ graph frames and graphX both do support this type of API.
 ### some graph-frames tutorials
 
   - http://graphframes.github.io/user-guide.html
+  - https://github.com/graphframes/graphframes/blob/master/src/main/scala/org/graphframes/examples/BeliefPropagation.scala
+  - https://ingaredblog.wordpress.com/2016/09/20/advanced-graph-algorithms-in-spark-using-graphx-aggregated-messages-and-collective-communication-techniques/
+  - http://www.cakesolutions.net/teamblogs/graphx-pregel-api-an-example
+  - http://lamastex.org/courses/ScalableDataScience/2016/graphXProgGuide.html
   - https://www.mapr.com/blog/using-spark-graphframes-analyze-facebook-connections
   - https://www.mapr.com/blog/how-get-started-using-apache-spark-graphx-scala
   - https://www.youtube.com/watch?v=zx9KI3DsZss
@@ -94,3 +98,11 @@ graph frames and graphX both do support this type of API.
 from generated graphml gephi visualization looks like
 ![graph](graph.png "gephi visualization")
 
+## open questions
+
+- make pregel apis work / learn how to use them
+- Are objects or primitives *better* for graphs? 
+	> GraphX optimizes the representation of vertex and edge types when they are 
+	> primitive data types (e.g., int, double, etc?) reducing the in memory footprint 
+	> by storing them in specialized arrays.
+	> http://lamastex.org/courses/ScalableDataScience/2016/graphXProgGuide.html
