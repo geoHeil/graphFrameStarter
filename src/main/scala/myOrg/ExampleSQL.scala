@@ -212,6 +212,38 @@ object ExampleSQL extends App {
   agg.show()
 
   // ########################################################################################################
+  // ####################### now via graphx pregel
+  // todo how to specify these messages here?
+  //  sendMsg: EdgeContext[VD, ED, A] => Unit,
+  //  mergeMsg: (A, A) => A,
+  val fraudulentConnections: VertexRDD[(Int, (String, Int))] = graphFraud.aggregateMessages[(Int, (String, Int))](
+    triplet => {
+      println(s"src: ${triplet.srcAttr._1}, which is fraud: ${triplet.srcAttr._2} " +
+        s"for destination: ${triplet.dstAttr._1}, which is fraud: ${triplet.dstAttr._2}")
+      if (triplet.dstAttr._2 == 1) {
+        // if destination is fraudulent node send fraud message to source
+        // Send message to destination vertex containing counter and age
+        triplet.sendToDst((1, triplet.srcAttr))
+      }
+      //      {
+      //        triplet.sendToDst((0, triplet.srcAttr))
+      //      }
+    },
+    // Add counter and fraudSum
+    // but ids increment , 1,2,3 a count would be 3 but sum is 6
+    (a, b) => (a._1 + b._1, (a._2._1, a._2._2 + b._2._2)) //, // Reduce Function
+  //TripletFields.None // this is optional, could speed up performance
+  )
+  val fraudulentConnectionsPercentage: VertexRDD[Double] =
+    fraudulentConnections.mapValues((id, value) =>
+      value match {
+        case (count, fraudSum) => {
+          println(s"count ${count}, value: (${fraudSum._1}, ${fraudSum._2})")
+          fraudSum._2.toDouble / count
+        }
+      })
+  fraudulentConnectionsPercentage.toDF().show
+
   val graph: Graph[Double, Int] =
     GraphGenerators.logNormalGraph(spark.sparkContext, numVertices = 100).mapVertices((id, _) => id.toDouble)
 
