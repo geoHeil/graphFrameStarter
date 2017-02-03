@@ -199,9 +199,9 @@ object ExampleSQL extends App {
   // to test use score of 1
   val fraudNeighbourWeight = 1.0
   // TODO how to add in percentage without join  / type of connection
-  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * (lit(1) + AM.dst("fraud")))
+  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * lit(1))// + AM.dst("fraud")))
     .otherwise(lit(0)) //todo make sure this is not resetting everything
-  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * (lit(2) + AM.src("fraud")))
+  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * lit(2))// + AM.src("fraud")))
     .otherwise(lit(0))
   // I am confused about the messages! why do I need to swap them?
   // how to prevent messages circulating forever?
@@ -210,6 +210,18 @@ object ExampleSQL extends App {
     .sendToDst(msgToSrc) // send source user's fraud to destination
     .agg(sum(AM.msg).as("summedFraud")) // sum up fraud, stored in AM.msg column
   agg.show()
+
+  // TODO WARN this is only going one level deep into the graph
+  g.aggregateMessages
+    .sendToSrc(msgToSrc)
+    .sendToDst(msgToDst)
+    .agg(sum(AM.msg))
+    .show
+  g.aggregateMessages
+    .sendToSrc(msgToDst)
+    .sendToDst(msgToSrc)
+    .agg(sum(AM.msg) / AM) // TODO warn this will not work
+    .show
 
   // ########################################################################################################
   // ####################### now via graphx pregel
