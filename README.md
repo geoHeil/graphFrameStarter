@@ -107,3 +107,5 @@ from generated graphml gephi visualization looks like
 	> primitive data types (e.g., int, double, etc?) reducing the in memory footprint 
 	> by storing them in specialized arrays.
 	> http://lamastex.org/courses/ScalableDataScience/2016/graphXProgGuide.html
+	
+	But scala tuples are objects as well ...

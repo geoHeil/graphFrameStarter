@@ -220,7 +220,7 @@ object ExampleSQL extends App {
   g.aggregateMessages
     .sendToSrc(msgToDst)
     .sendToDst(msgToSrc)
-    .agg(sum(AM.msg) / AM) // TODO warn this will not work
+    .agg(sum(AM.msg) / count(AM.msg))
     .show
 
   // ########################################################################################################
