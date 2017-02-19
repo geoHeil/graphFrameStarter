@@ -101,6 +101,7 @@ object ExampleSQL extends App {
   val friends: DataFrame = g.find("(a)-[e]->(b)")
   // 1) a-> b, direct, b fraud
   // naive version ###############################################################################
+  // 1.2 minutes, 3x joins
   val total = friends.groupBy($"a.id").count.withColumnRenamed("count", "totalCount")
   val fraudDirect = friends.filter($"b.fraud" === 1).groupBy($"a.id").count.withColumnRenamed("count", "fraudCount")
   // lets try it with join first, but already for this minimal dataset it is quite slow
@@ -111,8 +112,23 @@ object ExampleSQL extends App {
     .orderBy("id")
     .show)
 
-  // gwithout join, but fairly complex. TODO this is quite some code overhead. Could this be simplified (by a lot)?
+  // ####################################################################################################
+  // trying to avoid join of  naive version --> sort of failed 16 seconds 1x broadcast hash join
+  // downside is that type of connection is missing now ... but this could be integrated in a future version somehow
+  // and still different levels of network depth are not properly modeled (only taking direct friends into account)
+  // h is missing !!
+  friends
+    .select($"a.id", $"a.fraud".alias("selfFraud"), $"b.fraud")
+    .groupBy($"id", $"selfFraud").agg(avg("fraud").alias("fraudScore"))
+    .withColumn("realFraud", when($"selfFraud" === 1, 1).otherwise('fraudScore))
+    .drop("selfFraud", "fraudScore")
+    .show
+
+  // ####################################################################################################
+
+  // without join, but fairly complex. TODO this is quite some code overhead. Could this be simplified (by a lot)?
   // I know that the code handles multiple columns which is not really needed ... but anything else?
+  // fairly complex but h is included
   val fraudGroupDirect = friends.groupBy($"a.id", $"b.fraud").count
 
   val exploded = explode(array(
@@ -136,12 +152,11 @@ object ExampleSQL extends App {
       .fold(0.0) { case s: StatCounter => s.mean }
   })
   time(lookup.foldLeft(g.vertices) {
-    (currentDF, colName) =>
-      {
-        currentDF
-          .withColumn("directFraudulencyScore", when($"fraud" === 1, 1)
-            .otherwise(joinUDF(lit(colName._1), col(colName._1))))
-      }
+    (currentDF, colName) => {
+      currentDF
+        .withColumn("directFraudulencyScore", when($"fraud" === 1, 1)
+          .otherwise(joinUDF(lit(colName._1), col(colName._1))))
+    }
   }
     .orderBy("id")
     .show)
@@ -193,34 +208,32 @@ object ExampleSQL extends App {
   // now pregl message passing API: Message passing via AggregateMessages for graphFrames ##########################################
   val AM = AggregateMessages
 
-  //  val msgToSrc = AM.dst("fraud")
-  //  val msgToDst = AM.src("fraud")
   // multiply with weight (fraud far away is less important as fraud near the node)
   // to test use score of 1
   val fraudNeighbourWeight = 1.0
   // TODO how to add in percentage without join  / type of connection
-  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * lit(1))// + AM.dst("fraud")))
-    .otherwise(lit(0)) //todo make sure this is not resetting everything
-  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * lit(2))// + AM.src("fraud")))
-    .otherwise(lit(0))
+//  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * lit(1)) // + AM.dst("fraud")))
+//    .otherwise(lit(0))
+  //todo make sure this is not resetting everything
+//  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * lit(2)) // + AM.src("fraud")))
+//    .otherwise(lit(0))
+
+  // trying to simplify case when statement, as fraud is 0 for the otherwise case and 1 for fraud = 1
+  val msgToSrc: Column = AM.src("fraud")
+  val msgToDst: Column = AM.dst("fraud")
   // I am confused about the messages! why do I need to swap them?
   // how to prevent messages circulating forever?
   val agg = g.aggregateMessages
     .sendToSrc(msgToDst) // send destination user's fraud to source
     .sendToDst(msgToSrc) // send source user's fraud to destination
-    .agg(sum(AM.msg).as("summedFraud")) // sum up fraud, stored in AM.msg column
+    .agg(avg(AM.msg))
   agg.show()
 
   // TODO WARN this is only going one level deep into the graph
   g.aggregateMessages
     .sendToSrc(msgToSrc)
     .sendToDst(msgToDst)
-    .agg(sum(AM.msg))
-    .show
-  g.aggregateMessages
-    .sendToSrc(msgToDst)
-    .sendToDst(msgToSrc)
-    .agg(sum(AM.msg) / count(AM.msg))
+    .agg(avg(AM.msg))
     .show
 
   // ########################################################################################################
@@ -243,8 +256,8 @@ object ExampleSQL extends App {
     },
     // Add counter and fraudSum
     // but ids increment , 1,2,3 a count would be 3 but sum is 6
-    (a, b) => (a._1 + b._1, (a._2._1, a._2._2 + b._2._2)) //, // Reduce Function
-  //TripletFields.None // this is optional, could speed up performance
+    (a, b) => (a._1 + 1, (a._2._1, a._2._2 + b._2._2)) //, // Reduce Function
+    //TripletFields.None // this is optional, could speed up performance
   )
   val fraudulentConnectionsPercentage: VertexRDD[Double] =
     fraudulentConnections.mapValues((id, value) =>
@@ -286,7 +299,7 @@ object ExampleSQL extends App {
   // https://github.com/apache/tinkerpop/blob/4293eb333dfbf3aea19cd326f9f3d13619ac0b54/gremlin-core/src/main/java/org/apache/tinkerpop/gremlin/structure/io/graphml/GraphMLTokens.java
   /// TODO improve writer as outlined by https://github.com/sparkling-graph/sparkling-graph/issues/8 and integrate there
   def toGraphML(g: GraphFrame): String =
-    s"""
+  s"""
      |<?xml version="1.0" encoding="UTF-8"?>
      |<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
      |         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -298,26 +311,26 @@ object ExampleSQL extends App {
      |  <key id="e_edgeType" for="edge" attr.name="edgeType" attr.type="string"/>
      |  <graph id="G" edgedefault="directed">
      |${
-      g.vertices.map {
-        case Row(id, name, fraud) =>
-          s"""
+    g.vertices.map {
+      case Row(id, name, fraud) =>
+        s"""
            |      <node id="${id}">
            |         <data key = "v_name">${name}</data>
            |         <data key = "v_fraud">${fraud}</data>
            |      </node>
            """.stripMargin
-      }.collect.mkString.stripLineEnd
-    }
+    }.collect.mkString.stripLineEnd
+  }
      |${
-      g.edges.map {
-        case Row(src, dst, relationship) =>
-          s"""
+    g.edges.map {
+      case Row(src, dst, relationship) =>
+        s"""
            |      <edge source="${src}" target="${dst}">
            |      <data key="e_edgeType">${relationship}</data>
            |      </edge>
            """.stripMargin
-      }.collect.mkString.stripLineEnd
-    }
+    }.collect.mkString.stripLineEnd
+  }
      |  </graph>
      |</graphml>
   """.stripMargin
