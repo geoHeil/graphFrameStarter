@@ -51,7 +51,7 @@ object FraudCentrality extends VertexMeasure[Double]{
           }
         },
         // assuming fraud field is binary, an average works just fine as the aggregation method
-        mergeMsg = (a,b)=>a+b)
+        mergeMsg = (a,b)=>a+b) // TODO aggregate with avg, but only after it is clear what types of messages need to be sent i.e. only double or tuple
       // TODO find out if normalization is required / really useful for my modification, but in the end this is used
       // to generate a value [0, 1] i.e. sort of a probability which should be just  fine for me
       val normalizationValue=Math.sqrt(iterationRDD.map{case (vId,e)=>Math.pow(e,2)}.sum())
