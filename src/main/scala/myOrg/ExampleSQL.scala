@@ -1,5 +1,7 @@
 package myOrg
 
+//import myOrg.sparklingGraph.FraudCentrality
+//import myOrg.sparklingGraph.OperatorsDSL._
 import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
 import org.apache.spark.graphx.util.GraphGenerators
@@ -152,11 +154,12 @@ object ExampleSQL extends App {
       .fold(0.0) { case s: StatCounter => s.mean }
   })
   time(lookup.foldLeft(g.vertices) {
-    (currentDF, colName) => {
-      currentDF
-        .withColumn("directFraudulencyScore", when($"fraud" === 1, 1)
-          .otherwise(joinUDF(lit(colName._1), col(colName._1))))
-    }
+    (currentDF, colName) =>
+      {
+        currentDF
+          .withColumn("directFraudulencyScore", when($"fraud" === 1, 1)
+            .otherwise(joinUDF(lit(colName._1), col(colName._1))))
+      }
   }
     .orderBy("id")
     .show)
@@ -212,11 +215,11 @@ object ExampleSQL extends App {
   // to test use score of 1
   val fraudNeighbourWeight = 1.0
   // TODO how to add in percentage without join  / type of connection
-//  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * lit(1)) // + AM.dst("fraud")))
-//    .otherwise(lit(0))
+  //  val msgToSrc: Column = when(AM.src("fraud") === 1, lit(fraudNeighbourWeight) * lit(1)) // + AM.dst("fraud")))
+  //    .otherwise(lit(0))
   //todo make sure this is not resetting everything
-//  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * lit(2)) // + AM.src("fraud")))
-//    .otherwise(lit(0))
+  //  val msgToDst: Column = when(AM.dst("fraud") === 1, lit(fraudNeighbourWeight) * lit(2)) // + AM.src("fraud")))
+  //    .otherwise(lit(0))
 
   // trying to simplify case when statement, as fraud is 0 for the otherwise case and 1 for fraud = 1
   val msgToSrc: Column = AM.src("fraud")
@@ -237,7 +240,7 @@ object ExampleSQL extends App {
     .show
 
   // ########################################################################################################
-  // ####################### now via graphx pregel
+  // ####################### now via graphx pregel, still only one iteration!!
   // todo how to specify these messages here?
   //  sendMsg: EdgeContext[VD, ED, A] => Unit,
   //  mergeMsg: (A, A) => A,
@@ -257,7 +260,7 @@ object ExampleSQL extends App {
     // Add counter and fraudSum
     // but ids increment , 1,2,3 a count would be 3 but sum is 6
     (a, b) => (a._1 + 1, (a._2._1, a._2._2 + b._2._2)) //, // Reduce Function
-    //TripletFields.None // this is optional, could speed up performance
+  //TripletFields.None // this is optional, could speed up performance
   )
   val fraudulentConnectionsPercentage: VertexRDD[Double] =
     fraudulentConnections.mapValues((id, value) =>
@@ -293,13 +296,17 @@ object ExampleSQL extends App {
   // Display the results
   avgAgeOfOlderFollowers.toDF().show
   // ########################################################################################################
+  // ####################### now via graphx eigenvector iterative adapted
+//    graphFraud.fraudCentrality()//.toDF().show // just an alternate method to call execution of calculation
+//  FraudCentrality.compute(graphFraud) //.toDF().show
+  // ########################################################################################################
 
   // TODO access node via proper XML writer
   // maybe https://github.com/apache/tinkerpop/blob/4293eb333dfbf3aea19cd326f9f3d13619ac0b54/gremlin-core/src/main/java/org/apache/tinkerpop/gremlin/structure/io/graphml/GraphMLWriter.java is helpful
   // https://github.com/apache/tinkerpop/blob/4293eb333dfbf3aea19cd326f9f3d13619ac0b54/gremlin-core/src/main/java/org/apache/tinkerpop/gremlin/structure/io/graphml/GraphMLTokens.java
   /// TODO improve writer as outlined by https://github.com/sparkling-graph/sparkling-graph/issues/8 and integrate there
   def toGraphML(g: GraphFrame): String =
-  s"""
+    s"""
      |<?xml version="1.0" encoding="UTF-8"?>
      |<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
      |         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -311,26 +318,26 @@ object ExampleSQL extends App {
      |  <key id="e_edgeType" for="edge" attr.name="edgeType" attr.type="string"/>
      |  <graph id="G" edgedefault="directed">
      |${
-    g.vertices.map {
-      case Row(id, name, fraud) =>
-        s"""
+      g.vertices.map {
+        case Row(id, name, fraud) =>
+          s"""
            |      <node id="${id}">
            |         <data key = "v_name">${name}</data>
            |         <data key = "v_fraud">${fraud}</data>
            |      </node>
            """.stripMargin
-    }.collect.mkString.stripLineEnd
-  }
+      }.collect.mkString.stripLineEnd
+    }
      |${
-    g.edges.map {
-      case Row(src, dst, relationship) =>
-        s"""
+      g.edges.map {
+        case Row(src, dst, relationship) =>
+          s"""
            |      <edge source="${src}" target="${dst}">
            |      <data key="e_edgeType">${relationship}</data>
            |      </edge>
            """.stripMargin
-    }.collect.mkString.stripLineEnd
-  }
+      }.collect.mkString.stripLineEnd
+    }
      |  </graph>
      |</graphml>
   """.stripMargin
