@@ -75,6 +75,7 @@ graph frames and graphX both do support this type of API.
 
 ### ongoing discussions
 
+  - https://github.com/sparkling-graph/sparkling-graph/issues/12
   - http://stackoverflow.com/questions/42018905/spark-graph-frames-percentage
   - http://stackoverflow.com/questions/41946947/spark-graphframes-stateful-motif
   - http://stackoverflow.com/questions/41908966/spark-graph-efficient-joins

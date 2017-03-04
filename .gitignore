@@ -5,3 +5,5 @@ target
 metastore_db
 myGraph.gexf
 myGraph.graphml
+.idea
+derby.log
