@@ -2,6 +2,7 @@ package myOrg
 
 //import myOrg.sparklingGraph.FraudCentrality
 //import myOrg.sparklingGraph.OperatorsDSL._
+import myOrg.sparklingGraph.{FraudCentrality, VertexMeasureConfiguration}
 import org.apache.log4j.Logger
 import org.apache.spark.SparkConf
 import org.apache.spark.graphx.util.GraphGenerators
@@ -298,7 +299,7 @@ object ExampleSQL extends App {
   // ########################################################################################################
   // ####################### now via graphx eigenvector iterative adapted
 //    graphFraud.fraudCentrality()//.toDF().show // just an alternate method to call execution of calculation
-//  FraudCentrality.compute(graphFraud) //.toDF().show
+  FraudCentrality.compute(graphFraud, VertexMeasureConfiguration(treatAsUndirected=false, considerEdgeType = false)) //.toDF().show
   // ########################################################################################################
 
   // TODO access node via proper XML writer

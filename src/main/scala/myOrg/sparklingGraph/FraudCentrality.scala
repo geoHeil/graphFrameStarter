@@ -2,27 +2,27 @@ package myOrg.sparklingGraph
 
 import myOrg.sparklingGraph.EigenvectorUtils._
 import org.apache.spark.graphx._
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 import scala.reflect.ClassTag
 
 /**
   * adopted from https://github.com/sparkling-graph/sparkling-graph
   */
-object FraudCentrality extends VertexMeasure[Double]{
+object FraudCentrality /*extends VertexMeasure[Double]*/{
 
   /**
     * Generic Fraudulence Centrality computation method, should be used for extensions, computations are done until @continuePredicate gives true
     * @param graph - computation graph
     * @param vertexMeasureConfiguration - configuration of computation
     * @param continuePredicate - convergence predicate
-    * @param num - numeric for @ED
     * @tparam VD - vertex data type
     * @tparam ED - edge data type
     * @return graph where each vertex is associated with its fraudulence score
     */
   def computeFraudulence[VD:ClassTag,ED:ClassTag](graph:Graph[VD,ED],
                                                   vertexMeasureConfiguration: VertexMeasureConfiguration[VD,ED],
-                                                  continuePredicate:ContinuePredicate=convergenceAndIterationPredicate(1e-6))(implicit num:Numeric[ED])={
+                                                  continuePredicate:ContinuePredicate=convergenceAndIterationPredicate(1e-6))={
     val numberOfNodes=graph.numVertices
     val startingValue=1.0/numberOfNodes
     var computationGraph=graph.mapVertices((vId,data)=>startingValue)
@@ -39,7 +39,13 @@ object FraudCentrality extends VertexMeasure[Double]{
       // TODO find out what type of class should be passed to aggregate messages i.e. if double is enough, or if graphFraud.aggregateMessages[(Int, (String, Int))] as a full vertex (id, (name, fraud)) is required
       val iterationRDD=computationGraph.aggregateMessages[Double]( // where is the id of the final output if only the score is shred?
         sendMsg = context=>{
-          context.sendToDst(num.toDouble(context.attr)*context.srcAttr)
+          if (vertexMeasureConfiguration.considerEdgeType){
+//          context.sendToDst(num.toDouble(context.attr)*context.srcAttr)
+            throw NotImplementedException
+          }else{
+//            TODO which destination to choose here?
+            context.sendToDst(vertexFraudScore.toDouble(context.attr)*context.srcAttr)
+          }
           context.sendToSrc(0d)
           // I want to decay fraudulence scores further away by a factor, directness should be considered
           // as deliberate interaction with fraudulent vertex should be scored differently
@@ -67,11 +73,9 @@ object FraudCentrality extends VertexMeasure[Double]{
     * Computes Fraudulency Centrality for each vertex in graph
     * @param graph - computation graph
     * @param vertexMeasureConfiguration - configuration of computation
-    * @param num - numeric for @ED
     * @tparam VD - vertex data type
     * @tparam ED - edge data type
     * @return graph where each vertex is associated with its fraudulence score
     */
-  override def compute[VD:ClassTag, ED:ClassTag](graph: Graph[VD, ED],vertexMeasureConfiguration: VertexMeasureConfiguration[VD,ED])(implicit num:Numeric[ED]): Graph[Double, ED] = computeFraudulence(graph,vertexMeasureConfiguration)
-  // TODO find out what implicit num:Numeric[ED] is in my case
+  def compute[VD:ClassTag, ED:ClassTag](graph: Graph[VD, ED],vertexMeasureConfiguration: VertexMeasureConfiguration[VD,ED]): Graph[Double, ED] = computeFraudulence(graph,vertexMeasureConfiguration)
 }
